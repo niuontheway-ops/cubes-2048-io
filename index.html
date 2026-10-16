@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>CUBES 2048.io - 方块蛇竞技场</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='4' y='4' width='56' height='56' rx='12' fill='%23ffa94d'/%3E%3Crect x='10' y='10' width='44' height='16' rx='8' fill='rgba(255,255,255,0.35)'/%3E%3Ctext x='32' y='47' font-size='34' font-weight='bold' fill='white' text-anchor='middle' font-family='Arial'%3E2%3C/text%3E%3C/svg%3E">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden; background: #eef2f7;
+    font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  #game { position: fixed; inset: 0; display: block; }
+
+  /* ---------- 右手摇杆区 ---------- */
+  #joyZone { position: fixed; right: 0; bottom: 0; width: 55%; height: 46%; z-index: 5; touch-action: none; }
+  #joyBase {
+    position: fixed; width: 116px; height: 116px; border-radius: 50%;
+    background: rgba(255,255,255,0.30); border: 2.5px solid rgba(66,85,122,0.30);
+    transform: translate(-50%,-50%); z-index: 6; pointer-events: none;
+    box-shadow: inset 0 2px 10px rgba(66,85,122,0.10);
+  }
+  #joyKnob {
+    position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffffff, #c8d6ee);
+    border: 2.5px solid #42557a; transform: translate(-50%,-50%);
+    box-shadow: 0 3px 10px rgba(30,40,60,0.25);
+  }
+  #joyKnob.on { border-color: #1e90ff; background: radial-gradient(circle at 35% 30%, #ffffff, #a5d8ff); }
+
+  /* ---------- 左手技能栏 ---------- */
+  #skillBar { position: fixed; left: 12px; bottom: 16px; display: flex; gap: 10px; z-index: 6; }
+  .skillBtn {
+    width: 62px; height: 76px; border-radius: 15px; position: relative;
+    background: rgba(255,255,255,0.88); border: 2px solid rgba(66,85,122,0.32);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    box-shadow: 0 3px 10px rgba(30,40,60,0.12); touch-action: none; overflow: hidden;
+  }
+  .skillBtn .sbCd { position: absolute; inset: 0; pointer-events: none; border-radius: 13px; }
+  .skillBtn .sbIcon { line-height: 0; }
+  .skillBtn .sbName { font-size: 11px; font-weight: 800; color: #2b3a55; }
+  .skillBtn .sbPips { display: flex; gap: 3px; }
+  .skillBtn .sbPips i { width: 5px; height: 5px; border-radius: 50%; background: rgba(66,85,122,0.22); }
+  .skillBtn .sbPips i.on { background: #339af0; }
+  .skillBtn.locked { opacity: 0.42; filter: grayscale(0.7); }
+  .skillBtn.active { border-color: #f08c00; box-shadow: 0 0 14px rgba(255,212,59,0.65); }
+  .skillBtn.flash { animation: sbFlash 0.3s; }
+  @keyframes sbFlash { 0% { transform: scale(1); } 40% { transform: scale(0.88); } 100% { transform: scale(1); } }
+
+  /* ---------- HUD ---------- */
+  #scorePanel {
+    position: fixed; left: 12px; top: 12px; z-index: 4; min-width: 148px;
+    background: rgba(255,255,255,0.85); border: 1.5px solid rgba(66,85,122,0.25);
+    border-radius: 14px; padding: 8px 14px 9px; box-shadow: 0 3px 12px rgba(30,40,60,0.10);
+  }
+  .spTitle { font-size: 10px; color: #7d8bab; font-weight: 700; letter-spacing: 2px; }
+  #scoreVal { font-size: 32px; font-weight: 900; color: #2b3a55; line-height: 1.05; }
+  .spRow { display: flex; gap: 5px; margin-top: 3px; align-items: center; }
+  .chip2 { font-size: 11px; background: rgba(66,85,122,0.12); padding: 2px 7px; border-radius: 8px; color: #42557a; font-weight: 700; }
+  .chip2.head { background: #1e90ff; color: #fff; font-size: 13px; font-weight: 900; }
+  #statusChips { margin-top: 5px; min-height: 15px; }
+  .chip { display: inline-block; font-size: 10px; padding: 1.5px 7px; border-radius: 6px; margin-right: 4px; color: #fff; font-weight: 800; }
+  .chip.boost { background: #f08c00; } .chip.ghost { background: #9775fa; }
+  .chip.dash { background: #4dabf7; } .chip.burn { background: #ff6b6b; }
+
+  #boardPanel {
+    position: fixed; right: 12px; top: 12px; width: 152px; z-index: 4;
+    background: rgba(255,255,255,0.85); border: 1.5px solid rgba(66,85,122,0.25);
+    border-radius: 14px; padding: 8px 10px; box-shadow: 0 3px 12px rgba(30,40,60,0.10);
+  }
+  .bpTitle { font-size: 10px; color: #7d8bab; font-weight: 800; letter-spacing: 3px; margin-bottom: 3px; }
+  .br { display: flex; align-items: center; font-size: 12px; padding: 1.5px 4px; color: #2b3a55; border-radius: 6px; }
+  .br .rk { width: 15px; font-weight: 900; text-align: center; flex: none; }
+  .br .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 6px; }
+  .br .sc { font-weight: 800; }
+  .br.me { background: rgba(30,144,255,0.16); color: #1864ab; font-weight: 800; }
+
+  #toastWrap { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; align-items: center; z-index: 9; pointer-events: none; }
+  .toast {
+    background: rgba(255,255,255,0.94); border: 1.5px solid; border-radius: 20px;
+    padding: 6px 16px; font-size: 13px; font-weight: 800;
+    box-shadow: 0 4px 14px rgba(30,40,60,0.14); animation: toastIn 0.25s ease-out;
+    transition: opacity 0.35s; white-space: nowrap;
+  }
+  .toast.out { opacity: 0; }
+  @keyframes toastIn { from { transform: translateY(-12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  #killfeed { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 4px; align-items: center; z-index: 7; pointer-events: none; }
+  .kf { font-size: 12px; font-weight: 600; color: rgba(43,58,85,0.85); background: rgba(255,255,255,0.72); padding: 3px 12px; border-radius: 12px; animation: toastIn 0.25s; }
+
+  #topBtns { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; z-index: 9; }
+  .tbtn {
+    font-size: 11px; font-weight: 800; padding: 5px 13px; border-radius: 14px;
+    border: 1.5px solid rgba(66,85,122,0.3); background: rgba(255,255,255,0.82); color: #42557a;
+  }
+  .tbtn.off { opacity: 0.45; }
+
+  #countdown {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    font-size: 92px; font-weight: 900; color: #2b3a55; z-index: 10; pointer-events: none;
+    text-shadow: 0 8px 28px rgba(30,40,60,0.28);
+  }
+  .cdPop.go { animation: cdPop 0.35s ease-out; }
+  @keyframes cdPop { 0% { transform: scale(1.7); opacity: 0; } 60% { transform: scale(0.95); opacity: 1; } 100% { transform: scale(1); } }
+
+  /* ---------- 浮层 ---------- */
+  .overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(238,242,247,0.86); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    z-index: 20; padding: 16px;
+  }
+  .panel {
+    width: min(560px, 94vw); max-height: 94vh; overflow-y: auto;
+    background: #fff; border-radius: 22px; padding: 26px 28px;
+    box-shadow: 0 18px 50px rgba(30,40,60,0.18); border: 1.5px solid rgba(66,85,122,0.12);
+    text-align: center;
+  }
+  .logo { font-size: 34px; font-weight: 900; color: #2b3a55; letter-spacing: 1px; }
+  .logo span { color: #f08c00; }
+  .sub { font-size: 13px; color: #7d8bab; margin: 4px 0 16px; font-weight: 600; }
+  .nameRow { display: flex; gap: 10px; justify-content: center; margin-bottom: 14px; }
+  #nameInput {
+    width: 150px; padding: 10px 14px; font-size: 15px; border-radius: 12px;
+    border: 2px solid rgba(66,85,122,0.25); outline: none; text-align: center; font-weight: 700; color: #2b3a55;
+  }
+  #nameInput:focus { border-color: #1e90ff; }
+  .bigBtn {
+    padding: 11px 34px; font-size: 16px; font-weight: 900; color: #fff; border: none; border-radius: 14px;
+    background: linear-gradient(135deg, #339af0, #1c7ed6); box-shadow: 0 6px 18px rgba(28,126,214,0.35);
+  }
+  .bigBtn.ghost { background: rgba(66,85,122,0.12); color: #42557a; box-shadow: none; margin-top: 10px; }
+  .guide { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
+  .gItem { font-size: 12px; color: #42557a; background: rgba(66,85,122,0.08); padding: 6px 12px; border-radius: 10px; font-weight: 600; }
+  .gItem b { color: #1c7ed6; }
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+  .card { background: rgba(238,242,247,0.9); border-radius: 13px; padding: 10px 6px 9px; border: 1px solid rgba(66,85,122,0.10); }
+  .card .ci { display: block; margin: 0 auto 5px; }
+  .card b { display: block; font-size: 13px; color: #2b3a55; margin-bottom: 3px; }
+  .card span { display: block; font-size: 10.5px; color: #7d8bab; line-height: 1.45; }
+  .hazards { font-size: 12px; color: #42557a; background: rgba(255,135,135,0.10); border-radius: 11px; padding: 8px 12px; line-height: 1.6; }
+  .hazards .hz { color: #e03131; font-weight: 900; }
+  .hazards .hz2 { color: #f08c00; font-weight: 900; }
+  .menuBest { margin-top: 12px; font-size: 13px; color: #f08c00; font-weight: 800; min-height: 18px; }
+
+  .deadTitle { font-size: 26px; font-weight: 900; color: #2b3a55; margin-bottom: 14px; }
+  #deadStats { margin-bottom: 18px; }
+  .dsRow { display: flex; justify-content: space-between; padding: 7px 6px; font-size: 14px; color: #42557a; border-bottom: 1px dashed rgba(66,85,122,0.15); }
+  .dsRow b { color: #2b3a55; }
+  .dsRow .newbest { color: #f08c00; }
+
+  /* ---------- 竖屏提示 ---------- */
+  #portrait { flex-direction: column; gap: 18px; }
+  .phoneIcon {
+    width: 74px; height: 128px; border-radius: 14px; border: 4px solid #42557a;
+    position: relative; animation: rotPhone 2.2s ease-in-out infinite;
+    background: rgba(255,255,255,0.6);
+  }
+  .phoneIcon::after {
+    content: ""; position: absolute; left: 50%; bottom: 7px; transform: translateX(-50%);
+    width: 24px; height: 4px; border-radius: 2px; background: #42557a;
+  }
+  @keyframes rotPhone { 0%,35% { transform: rotate(0deg); } 65%,100% { transform: rotate(-90deg); } }
+  .portraitText { font-size: 17px; font-weight: 800; color: #2b3a55; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- 右手方向摇杆区 -->
+<div id="joyZone"></div>
+<div id="joyBase"><div id="joyKnob"></div></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="scorePanel">
+    <div class="spTitle">分数</div>
+    <div id="scoreVal">0</div>
+    <div class="spRow">
+      <span id="headChip" class="chip2 head">2</span>
+      <span class="chip2">长度 <b id="lenChip">4</b></span>
+      <span class="chip2">最高 <b id="bestVal">0</b></span>
+    </div>
+    <div id="statusChips"></div>
+  </div>
+  <div id="boardPanel">
+    <div class="bpTitle">排行榜</div>
+    <div id="boardRows"></div>
+  </div>
+  <div id="toastWrap"></div>
+  <div id="killfeed"></div>
+  <div id="topBtns">
+    <button id="btnSound" class="tbtn">音效</button>
+    <button id="btnMusic" class="tbtn">音乐</button>
+    <button id="btnPause" class="tbtn">暂停</button>
+  </div>
+  <div id="skillBar"></div>
+</div>
+
+<div id="countdown"></div>
+
+<!-- 开始菜单 -->
+<div id="menu" class="overlay">
+  <div class="panel">
+    <div class="logo">CUBES <span>2048</span>.io</div>
+    <div class="sub">立方体蛇 × 2048 合并 · 吞人竞技场</div>
+    <div class="nameRow">
+      <input id="nameInput" maxlength="8" placeholder="输入昵称" value="你">
+      <button id="btnStart" class="bigBtn">开始游戏</button>
+    </div>
+    <div class="guide">
+      <div class="gItem"><b>右手</b> 摇杆控制方向</div>
+      <div class="gItem"><b>左手</b> 释放技能</div>
+      <div class="gItem"><b>桌面</b> 鼠标转向 · 空格加速 · 1/2/3 技能</div>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <svg class="ci" width="24" height="24" viewBox="0 0 24 24"><path d="M13 2 L5 13 h5 l-1 9 8-11 h-5 z" fill="#f08c00"/></svg>
+        <b>加速</b><span>按住极速 2 秒，冷却 6 秒，消耗尾部小方块</span>
+      </div>
+      <div class="card">
+        <svg class="ci" width="24" height="24" viewBox="0 0 24 24"><path d="M5 5 L11 12 L5 19 M12 5 L18 12 L12 19" stroke="#4dabf7" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <b>闪身步</b><span>吃掉 » 技能块获得，瞬间冲刺躲避敌人</span>
+      </div>
+      <div class="card">
+        <svg class="ci" width="24" height="24" viewBox="0 0 24 24"><path d="M2 12 Q6 5 12 5 Q18 5 22 12 Q18 19 12 19 Q6 19 2 12 Z" stroke="#9775fa" stroke-width="2.2" fill="none" stroke-linecap="round"/><circle cx="12" cy="12" r="3" fill="#9775fa"/></svg>
+        <b>隐身</b><span>吃掉技能块获得，短暂消失但无法攻击</span>
+      </div>
+      <div class="card">
+        <svg class="ci" width="24" height="24" viewBox="0 0 24 24"><path d="M12 2 C14 6 18 8 18 13 A6 6 0 0 1 6 13 C6 8 10 6 12 2 Z" stroke="#ff6b6b" stroke-width="2.2" fill="none" stroke-linejoin="round"/><path d="M12 10 C13.5 12 14 13 14 14.5 A2 2 0 0 1 10 14.5 C10 13 10.5 12 12 10 Z" fill="#ff6b6b"/></svg>
+        <b>烧心</b><span>吃掉技能块获得，命中敌人分数减半</span>
+      </div>
+    </div>
+    <div class="hazards">
+      合并相同数字升级头部 · 吞掉比你小的敌人 · 小心场上 <span class="hz">÷</span> 陷阱(数字减半) · 捡 <span class="hz2">闪电球</span> 刷新加速冷却 · 技能块每吞一个 +1 次使用(上限 3)
+    </div>
+    <div id="menuBest" class="menuBest"></div>
+  </div>
+</div>
+
+<!-- 死亡 -->
+<div id="dead" class="overlay" style="display:none">
+  <div class="panel">
+    <div class="deadTitle">被吞掉了</div>
+    <div id="deadStats"></div>
+    <button id="btnRespawn" class="bigBtn">再来一局</button>
+  </div>
+</div>
+
+<!-- 暂停 -->
+<div id="pauseScr" class="overlay" style="display:none">
+  <div class="panel">
+    <div class="deadTitle">已暂停</div>
+    <button id="btnResume" class="bigBtn">继续游戏</button>
+    <br>
+    <button id="btnRestart" class="bigBtn ghost">重新开始</button>
+  </div>
+</div>
+
+<!-- 竖屏提示 -->
+<div id="portrait" class="overlay" style="display:none">
+  <div class="phoneIcon"></div>
+  <div class="portraitText">请将手机横屏进行游戏</div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/world.js"></script>
+<script src="js/bots.js"></script>
+<script src="js/render.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
